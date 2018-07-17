@@ -13,6 +13,7 @@ RUN framework_support_installable_local=$(basename $framework_support_installabl
     pip install $framework_support_installable_local && \
     rm $framework_support_installable_local
 
+<<<<<<< Upstream, based on source/master
 RUN pip install --no-cache --upgrade tensorflow==1.8.0
 
 COPY sagemaker-tensorflow-extensions sagemaker-tensorflow-extensions
@@ -21,6 +22,12 @@ RUN cd sagemaker-tensorflow-extensions && \
     pip install . && \
     cd .. && \
     rm -rf sagemaker-tensorflow-extensions
+=======
+RUN pip --no-cache-dir install \
+	bayesian-optimization \
+	spacy \
+	tensorflow-hub
+>>>>>>> 2049820 [update] have bayesian optimization in the docker image for sagemaker
 
 # entry.py comes from sagemaker-container-support
 ENTRYPOINT ["entry.py"]

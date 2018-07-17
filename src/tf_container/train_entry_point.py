@@ -161,11 +161,11 @@ def train():
 
     save_tf_config_env_var(tf_config)
 
-    train_wrapper.train()
+    best_model_path = train_wrapper.train()
 
     # only the master should export the model at the end of the execution
     if checkpoint_dir != env.model_dir and train_wrapper.task_type == 'master' and train_wrapper.saves_training():
-        serve.export_saved_model(checkpoint_dir, env.model_dir)
+        serve.export_saved_model(best_model_path, env.model_dir)
 
     if train_wrapper.task_type != 'master':
         _wait_until_master_is_down(_get_master(tf_config))

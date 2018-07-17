@@ -11,12 +11,12 @@
 #  express or implied. See the License for the specific language governing 
 #  permissions and limitations under the License.
 
-import boto3
 import inspect
 import os
 import tensorflow as tf
 from tf_container.run import logger
 import tf_container.s3_fs as s3_fs
+from bayes_opt.bayesian_optimization import BayesianOptimization
 
 
 class Trainer(object):
@@ -53,7 +53,7 @@ class Trainer(object):
         self.train_steps = train_steps
         self.eval_steps = eval_steps
         self.input_channels = input_channels
-        self.model_path = model_path
+        self.model_path_base = model_path
         self.ouput_path = output_path
         self.task_type = None
 
@@ -63,14 +63,56 @@ class Trainer(object):
 
         if model_path.startswith('s3://'):
             s3_fs.configure_s3_fs(model_path)
+    
+        
+    def params2Path(self, params):
+        return "-".join(["%s_%.2f" % (str(paramName), float(paramVal)) for paramName, paramVal in sorted(params.items(), key=lambda x:x[0])])
 
     def train(self):
+        
+        if "tunning" not in self.customer_params:
+            self.model_path = self.model_path_base
+            self.trainModelOnParams()
+            return 
+        exploratoryParams =  self.customer_params['tunning']
+        def addParamsTrain(**params):
+            self.customer_params.update(params)
+            self.model_path = os.path.join(self.model_path_base, self.params2Path(params))
+            estimator = self.trainModelOnParams()
+            invoke_args = self._resolve_input_fn_args(self.customer_script.eval_input_fn)
+            res = estimator.evaluate(lambda: self.customer_script.eval_input_fn(**invoke_args))
+            return res['accuracy']
+            
+        nnBO = BayesianOptimization(addParamsTrain, exploratoryParams)
+        ## do a first exploratory work with many init and big kappa
+        exploratory_tunning = self.customer_params['exploratory_tunning'] if 'exploratory_tunning' in self.customer_params else 6
+        nnBO.maximize(init_points=2, n_iter=exploratory_tunning, kappa=5, acq='ei')
+        #finetune with small kappa
+        fine_tunning = self.customer_params['fine_tunning'] if 'fine_tunning' in self.customer_params else 6
+        nnBO.maximize(init_points=0, n_iter=fine_tunning, kappa=2, acq='ei')
+        
+        logger.info( "-------------------")
+        logger.info( "model results")
+        for params, results in zip(nnBO.res['all']['params'], nnBO.res['all']['values']):
+            logger.info( "%s : %f" % (str(params), results))
+        logger.info( "-------------------")
+        logger.info( "best model")
+        logger.info(nnBO.res['max']['max_params'])
+        logger.info(nnBO.res['max']['max_val'])
+        logger.info( "-------------------")
+        best_model_path = os.path.join(self.model_path_base, self.params2Path(nnBO.res['max']['max_params']))
+        logger.info("best_model_path=%s" % best_model_path)
+        return best_model_path
+        
+    def trainModelOnParams(self):
         run_config = self._build_run_config()
-        estimator = self._build_estimator(run_config=run_config)
         train_spec = self._build_train_spec()
         eval_spec = self._build_eval_spec()
-
+        
+        estimator = self._build_estimator(run_config=run_config)
         tf.estimator.train_and_evaluate(estimator=estimator, train_spec=train_spec, eval_spec=eval_spec)
+        return estimator
+        
 
     def _build_run_config(self):
         valid_runconfig_keys = ['save_summary_steps', 'save_checkpoints_secs', 'save_checkpoints_steps',
