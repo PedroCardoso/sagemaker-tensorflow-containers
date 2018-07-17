@@ -29,6 +29,7 @@ RUN cd sagemaker-tensorflow-extensions && \
     pip install . && \
     cd .. && \
     rm -rf sagemaker-tensorflow-extensions
+
 RUN pip --no-cache-dir install \
 	bayesian-optimization \
 	spacy \
