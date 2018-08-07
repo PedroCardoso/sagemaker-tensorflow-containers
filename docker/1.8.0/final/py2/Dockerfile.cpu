@@ -22,5 +22,10 @@ RUN cd sagemaker-tensorflow-extensions && \
     cd .. && \
     rm -rf sagemaker-tensorflow-extensions
 
+RUN pip --no-cache-dir install \
+	bayesian-optimization \
+	spacy \
+	tensorflow-hub
+	
 # entry.py comes from sagemaker-container-support
 ENTRYPOINT ["entry.py"]
