@@ -71,6 +71,7 @@ class Trainer(object):
         eval_spec = self._build_eval_spec()
 
         tf.estimator.train_and_evaluate(estimator=estimator, train_spec=train_spec, eval_spec=eval_spec)
+        return estimator
 
     def _build_run_config(self):
         valid_runconfig_keys = ['save_summary_steps', 'save_checkpoints_secs', 'save_checkpoints_steps',
